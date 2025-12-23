@@ -1,66 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Website from './components/Website';
 import AdminLogin from './components/AdminLogin';
-import AdminDashboard from './components/AdminDashboard';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { initialServices, initialContactInfo, initialVisitorData, initialTestimonials } from './data/initialData';
-import { Service, ContactInfo, VisitorData, Testimonial } from './types';
+import AdminDashboardWrapper from './components/AdminDashboardWrapper';
+import { supabaseOperations } from './lib/supabaseOperations';
+import { initialServices, initialContactInfo, initialTestimonials } from './data/initialData';
+import { Service, ContactInfo, Testimonial } from './types';
 
 function App() {
-  const [services, setServices] = useLocalStorage<Service[]>('virtu-serve-services', initialServices);
-  const [contactInfo, setContactInfo] = useLocalStorage<ContactInfo>('virtu-serve-contact', initialContactInfo);
-  const [visitorData, setVisitorData] = useLocalStorage<VisitorData[]>('virtu-serve-visitors', initialVisitorData);
-  const [testimonials, setTestimonials] = useLocalStorage<Testimonial[]>('virtu-serve-testimonials', initialTestimonials);
+  const [services, setServices] = useState<Service[]>([]);
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(initialContactInfo);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleVisit = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const existingData = visitorData.find(data => data.date === today);
-    
-    if (existingData) {
-      setVisitorData(visitorData.map(data => 
-        data.date === today 
-          ? { ...data, visitors: data.visitors + 1 }
-          : data
-      ));
-    } else {
-      setVisitorData([...visitorData, { date: today, visitors: 1 }]);
+  useEffect(() => {
+    loadWebsiteData();
+  }, []);
+
+  const loadWebsiteData = async () => {
+    try {
+      const [servicesData, contactData, testimonialsData] = await Promise.all([
+        supabaseOperations.fetchServices(),
+        supabaseOperations.fetchContactInfo(),
+        supabaseOperations.fetchTestimonials(),
+      ]);
+
+      setServices(servicesData);
+      setContactInfo(contactData || initialContactInfo);
+      setTestimonials(testimonialsData);
+    } catch (err) {
+      console.error('Error loading website data:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const handleVisit = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      await supabaseOperations.recordVisit(today);
+    } catch (err) {
+      console.error('Error recording visit:', err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            <Website 
+            <Website
               services={services}
               contactInfo={contactInfo}
               testimonials={testimonials}
               onVisit={handleVisit}
             />
-          } 
+          }
         />
-        <Route 
-          path="/admin" 
+        <Route
+          path="/admin"
           element={
             isAdminLoggedIn ? (
-              <AdminDashboard
-                services={services}
-                contactInfo={contactInfo}
-                visitorData={visitorData}
-                testimonials={testimonials}
-                onUpdateServices={setServices}
-                onUpdateContactInfo={setContactInfo}
-                onUpdateTestimonials={setTestimonials}
+              <AdminDashboardWrapper
                 onLogout={() => setIsAdminLoggedIn(false)}
               />
             ) : (
               <AdminLogin onLogin={() => setIsAdminLoggedIn(true)} />
             )
-          } 
+          }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

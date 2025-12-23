@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, User } from 'lucide-react';
+import { supabaseOperations } from '../lib/supabaseOperations';
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -9,18 +10,26 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME;
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-    
-    if (username === adminUsername && password === adminPassword) {
-      onLogin();
-      setError('');
-    } else {
-      setError('Invalid credentials');
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const isAuthenticated = await supabaseOperations.authenticateAdmin(username, password);
+
+      if (isAuthenticated) {
+        onLogin();
+      } else {
+        setError('Invalid credentials');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Authentication failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -88,9 +97,10 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            disabled={isLoading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login
+            {isLoading ? 'Authenticating...' : 'Login'}
           </button>
         </form>
       </div>
