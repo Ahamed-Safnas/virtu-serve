@@ -22,28 +22,26 @@ export const supabaseOperations = {
   },
 
   async updateServices(services: Service[]): Promise<void> {
-    const { error: deleteError } = await supabase
-      .from('services')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-update-services`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ services }),
+        }
+      );
 
-    if (deleteError) {
-      console.error('Error deleting services:', deleteError);
-      throw new Error('Failed to update services');
-    }
-
-    const { error: insertError } = await supabase
-      .from('services')
-      .insert(services.map(service => ({
-        id: service.id,
-        title: service.title,
-        description: service.description,
-        category: service.category,
-      })));
-
-    if (insertError) {
-      console.error('Error inserting services:', insertError);
-      throw new Error('Failed to update services');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update services');
+      }
+    } catch (error) {
+      console.error('Error updating services:', error);
+      throw error;
     }
   },
 
@@ -70,31 +68,26 @@ export const supabaseOperations = {
   },
 
   async updateTestimonials(testimonials: Testimonial[]): Promise<void> {
-    const { error: deleteError } = await supabase
-      .from('testimonials')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-update-testimonials`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ testimonials }),
+        }
+      );
 
-    if (deleteError) {
-      console.error('Error deleting testimonials:', deleteError);
-      throw new Error('Failed to update testimonials');
-    }
-
-    const { error: insertError } = await supabase
-      .from('testimonials')
-      .insert(testimonials.map(testimonial => ({
-        id: testimonial.id,
-        name: testimonial.name,
-        designation: testimonial.designation,
-        rating: testimonial.rating,
-        comment: testimonial.comment,
-        avatar: testimonial.avatar,
-        date_added: testimonial.dateAdded,
-      })));
-
-    if (insertError) {
-      console.error('Error inserting testimonials:', insertError);
-      throw new Error('Failed to update testimonials');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update testimonials');
+      }
+    } catch (error) {
+      console.error('Error updating testimonials:', error);
+      throw error;
     }
   },
 
@@ -124,43 +117,26 @@ export const supabaseOperations = {
   },
 
   async updateContactInfo(contactInfo: ContactInfo): Promise<void> {
-    const existing = await supabase
-      .from('contact_info')
-      .select('id')
-      .limit(1)
-      .maybeSingle();
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-update-contact`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify(contactInfo),
+        }
+      );
 
-    if (existing.data) {
-      const { error } = await supabase
-        .from('contact_info')
-        .update({
-          phone: contactInfo.phone,
-          email: contactInfo.email,
-          address: contactInfo.address,
-          business_hours: contactInfo.businessHours,
-          social_media: contactInfo.socialMedia,
-        })
-        .eq('id', existing.data.id);
-
-      if (error) {
-        console.error('Error updating contact info:', error);
-        throw new Error('Failed to update contact info');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update contact info');
       }
-    } else {
-      const { error } = await supabase
-        .from('contact_info')
-        .insert({
-          phone: contactInfo.phone,
-          email: contactInfo.email,
-          address: contactInfo.address,
-          business_hours: contactInfo.businessHours,
-          social_media: contactInfo.socialMedia,
-        });
-
-      if (error) {
-        console.error('Error creating contact info:', error);
-        throw new Error('Failed to create contact info');
-      }
+    } catch (error) {
+      console.error('Error updating contact info:', error);
+      throw error;
     }
   },
 
@@ -182,31 +158,25 @@ export const supabaseOperations = {
   },
 
   async recordVisit(date: string): Promise<void> {
-    const { data: existing } = await supabase
-      .from('visitor_stats')
-      .select('*')
-      .eq('date', date)
-      .maybeSingle();
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-record-visit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ date }),
+        }
+      );
 
-    if (existing) {
-      const { error } = await supabase
-        .from('visitor_stats')
-        .update({ visitors: existing.visitors + 1 })
-        .eq('date', date);
-
-      if (error) {
-        console.error('Error updating visitor stats:', error);
-        throw new Error('Failed to record visit');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to record visit');
       }
-    } else {
-      const { error } = await supabase
-        .from('visitor_stats')
-        .insert({ date, visitors: 1 });
-
-      if (error) {
-        console.error('Error inserting visitor stats:', error);
-        throw new Error('Failed to record visit');
-      }
+    } catch (error) {
+      console.error('Error recording visit:', error);
     }
   },
 
