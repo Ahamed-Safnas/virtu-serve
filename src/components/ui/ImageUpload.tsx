@@ -9,20 +9,21 @@ interface ImageUploadProps {
 
 const DEFAULT_AVATARS = {
   male: '/images/manager.png',
-  female: '/images/woman.png' 
+  female: '/images/woman.png'
 };
 
 export default function ImageUpload({ currentImage, onImageChange, className = '' }: ImageUploadProps) {
   const [uploadError, setUploadError] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
     // Check file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      return 'Please upload a valid image file (JPG, PNG, or GIF)';
+      return 'Please upload a valid image file (JPG, PNG, GIF, or WebP)';
     }
 
     // Check file size (max 5MB)
@@ -45,31 +46,75 @@ export default function ImageUpload({ currentImage, onImageChange, className = '
     }
 
     setUploadError('');
-    setIsUploading(true);
+    setSelectedFile(file);
 
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setPreviewImage(result);
-      setIsUploading(false);
     };
     reader.onerror = () => {
       setUploadError('Failed to read the selected file');
-      setIsUploading(false);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleUploadConfirm = () => {
-    if (previewImage) {
-      onImageChange(previewImage);
+  const handleUploadConfirm = async () => {
+    if (!previewImage || !selectedFile) {
+      setUploadError('No file selected');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadError('');
+
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      // Upload via Edge Function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-testimonial-avatar`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed (${response.status})`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.url) {
+        throw new Error('Upload successful but no URL returned');
+      }
+
+      onImageChange(result.url);
       setPreviewImage('');
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setUploadError(errorMessage);
+      console.error('Image upload error:', err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleUploadCancel = () => {
     setPreviewImage('');
+    setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -82,8 +127,9 @@ export default function ImageUpload({ currentImage, onImageChange, className = '
   };
 
   const handleRemoveImage = () => {
-    onImageChange(DEFAULT_AVATARS.female); // Default to female avatar
+    onImageChange(DEFAULT_AVATARS.female);
     setPreviewImage('');
+    setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
